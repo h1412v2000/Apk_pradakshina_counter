@@ -1,0 +1,52 @@
+[
+  {
+    "name": "Tirupati Venkateswara Temple",
+    "deity": "Lord Venkateswara / Balaji",
+    "city": "Tirupati",
+    "state": "Andhra Pradesh",
+    "lat": 13.6833,
+    "lng": 79.3500,
+    "geofence_radius_m": 250.0,
+    "verified": true
+  },
+  {
+    "name": "Meenakshi Amman Temple",
+    "deity": "Goddess Meenakshi / Lord Shiva",
+    "city": "Madurai",
+    "state": "Tamil Nadu",
+    "lat": 9.9195,
+    "lng": 78.1193,
+    "geofence_radius_m": 150.0,
+    "verified": true
+  },
+  {
+    "name": "Kashi Vishwanath Temple",
+    "deity": "Lord Shiva",
+    "city": "Varanasi",
+    "state": "Uttar Pradesh",
+    "lat": 25.3109,
+    "lng": 83.0104,
+    "geofence_radius_m": 100.0,
+    "verified": true
+  },
+  {
+    "name": "Guruvayur Temple",
+    "deity": "Lord Guruvayurappan (Krishna)",
+    "city": "Guruvayur",
+    "state": "Kerala",
+    "lat": 10.5946,
+    "lng": 76.0379,
+    "geofence_radius_m": 120.0,
+    "verified": true
+  },
+  {
+    "name": "Somnath Temple",
+    "deity": "Lord Shiva (Jyotirlinga)",
+    "city": "Veraval",
+    "state": "Gujarat",
+    "lat": 20.8880,
+    "lng": 70.4012,
+    "geofence_radius_m": 200.0,
+    "verified": true
+  }
+]
