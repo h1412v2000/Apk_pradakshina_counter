@@ -1,0 +1,56 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev automake build-essential ccache
+
+      - name: Install Buildozer
+        run: pip install --upgrade pip buildozer cython==0.29.36 virtualenv
+
+      - name: Locate buildozer.spec
+        id: locate
+        run: |
+          SPEC_PATH=$(find . -maxdepth 4 -name "buildozer.spec" | head -n 1)
+          if [ -z "$SPEC_PATH" ]; then
+            echo "ERROR: buildozer.spec not found anywhere in repo!"
+            find . -maxdepth 4 -type f -name "*.py" -o -name "*.spec"
+            exit 1
+          fi
+          SPEC_DIR=$(dirname "$SPEC_PATH")
+          echo "Found buildozer.spec at: $SPEC_PATH"
+          echo "spec_dir=$SPEC_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Build APK
+        working-directory: ${{ steps.locate.outputs.spec_dir }}
+        run: yes | buildozer -v android debug
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+
+      - name: Find built APK
+        id: findapk
+        run: |
+          APK_DIR=$(find . -name "*.apk" -path "*/bin/*" | head -n 1 | xargs dirname)
+          echo "apk_dir=$APK_DIR" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pradakshina-tracker-apk
+          path: "**/bin/*.apk"
+          if-no-files-found: error
