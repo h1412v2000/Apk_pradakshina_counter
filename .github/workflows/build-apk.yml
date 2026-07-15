@@ -18,8 +18,9 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config \
-            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev automake build-essential ccache
+          sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool libtool-bin \
+            pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev \
+            automake build-essential ccache patchelf
 
       - name: Install Buildozer
         run: pip install --upgrade pip buildozer cython==0.29.36 virtualenv
@@ -36,9 +37,13 @@ jobs:
 
       - name: Build APK (verbose)
         working-directory: ${{ steps.locate.outputs.spec_dir }}
-        run: buildozer -v android debug
+        run: buildozer -v android debug 2>&1 | tee /home/runner/build_full.log
         env:
           JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+
+      - name: Show last 200 lines of build log on failure
+        if: failure()
+        run: tail -n 200 /home/runner/build_full.log
 
       - uses: actions/upload-artifact@v4
         with:
@@ -46,10 +51,10 @@ jobs:
           path: "**/bin/*.apk"
           if-no-files-found: error
 
-      - name: Upload full build log on failure
-        if: failure()
+      - name: Upload full build log (always)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: buildozer-log
-          path: "**/.buildozer/**/logs/*.txt"
+          name: full-build-log
+          path: /home/runner/build_full.log
           if-no-files-found: ignore
