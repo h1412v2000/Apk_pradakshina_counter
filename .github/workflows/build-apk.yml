@@ -24,33 +24,39 @@ jobs:
       - name: Install Buildozer
         run: pip install --upgrade pip buildozer cython==0.29.36 virtualenv
 
+      - name: Accept Android SDK licenses
+        run: |
+          mkdir -p "$ANDROID_HOME/licenses" || true
+          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$ANDROID_HOME/licenses/android-sdk-license"
+          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> "$ANDROID_HOME/licenses/android-sdk-license"
+          echo "84831b9409646a918e30573bab4c9c91346d8abd" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+
       - name: Locate buildozer.spec
         id: locate
         run: |
           SPEC_PATH=$(find . -maxdepth 4 -name "buildozer.spec" | head -n 1)
           if [ -z "$SPEC_PATH" ]; then
-            echo "ERROR: buildozer.spec not found anywhere in repo!"
-            find . -maxdepth 4 -type f -name "*.py" -o -name "*.spec"
+            echo "ERROR: buildozer.spec not found!"
             exit 1
           fi
-          SPEC_DIR=$(dirname "$SPEC_PATH")
-          echo "Found buildozer.spec at: $SPEC_PATH"
-          echo "spec_dir=$SPEC_DIR" >> "$GITHUB_OUTPUT"
+          echo "spec_dir=$(dirname "$SPEC_PATH")" >> "$GITHUB_OUTPUT"
 
-      - name: Build APK
+      - name: Build APK (verbose)
         working-directory: ${{ steps.locate.outputs.spec_dir }}
-        run: yes | buildozer -v android debug
+        run: buildozer -v android debug
         env:
           JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
-
-      - name: Find built APK
-        id: findapk
-        run: |
-          APK_DIR=$(find . -name "*.apk" -path "*/bin/*" | head -n 1 | xargs dirname)
-          echo "apk_dir=$APK_DIR" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
           name: pradakshina-tracker-apk
           path: "**/bin/*.apk"
           if-no-files-found: error
+
+      - name: Upload full build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: buildozer-log
+          path: "**/.buildozer/**/logs/*.txt"
+          if-no-files-found: ignore
