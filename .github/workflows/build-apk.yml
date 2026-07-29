@@ -55,15 +55,16 @@ jobs:
       - name: Show buildozer.spec (sanity check)
         run: cat buildozer.spec
 
-      - name: Build debug APK
-        run: buildozer -v android debug 2>&1 | tee build_output.log
+      - name: Build and auto-diagnose
+        run: python3 build_and_diagnose.py
 
-      - name: Upload build log (only if build failed)
-        if: failure()
+      - name: Upload build log (always)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-output-log
           path: build_output.log
+          if-no-files-found: ignore
 
       - name: Upload APK
         if: success()
