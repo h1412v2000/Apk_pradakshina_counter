@@ -52,28 +52,19 @@ jobs:
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
 
-      - name: Build debug APK (verbose)
+      - name: Build debug APK
         run: buildozer -v android debug 2>&1 | tee build_output.log
 
-      - name: Upload readable build output (always)
-        if: always()
+      - name: Upload build log (only if build failed)
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: build-output-log
           path: build_output.log
-          if-no-files-found: ignore
 
-      - name: Upload full buildozer internal log (always)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: buildozer-internal-log
-          path: .buildozer/android/platform/build-*/build.log
-          if-no-files-found: ignore
-
-      - name: Upload APK artifact
+      - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: pradakshina-tracker-debug-apk
+          name: pradakshina-tracker-apk
           path: bin/*.apk
