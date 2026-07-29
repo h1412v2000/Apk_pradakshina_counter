@@ -15,7 +15,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
       - name: Install system dependencies
         run: |
@@ -23,13 +23,15 @@ jobs:
           sudo apt-get install -y \
             git zip unzip openjdk-17-jdk python3-pip autoconf libtool \
             pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev \
-            libtinfo5 cmake libffi-dev libssl-dev build-essential \
-            ccache automake
+            libtinfo5 libtinfo-dev cmake libffi-dev libssl-dev build-essential \
+            ccache automake libltdl-dev
 
-      - name: Install buildozer
+      - name: Install pinned build tools
         run: |
-          pip install --upgrade pip
-          pip install buildozer
+          pip install --upgrade pip setuptools wheel
+          pip install Cython==0.29.36
+          pip install buildozer==1.5.0
+          pip install python-for-android==2024.1.21
 
       - name: Set JAVA_HOME
         run: echo "JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac))))" >> $GITHUB_ENV
@@ -50,18 +52,27 @@ jobs:
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
 
-      - name: Build debug APK
-        run: buildozer -v android debug
+      - name: Build debug APK (verbose)
+        run: buildozer -v android debug 2>&1 | tee build_output.log
 
-      - name: Upload full build log (always, for debugging)
+      - name: Upload readable build output (always)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: buildozer-log
+          name: build-output-log
+          path: build_output.log
+          if-no-files-found: ignore
+
+      - name: Upload full buildozer internal log (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: buildozer-internal-log
           path: .buildozer/android/platform/build-*/build.log
           if-no-files-found: ignore
 
       - name: Upload APK artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: pradakshina-tracker-debug-apk
