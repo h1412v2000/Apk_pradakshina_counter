@@ -12,12 +12,6 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup Node.js environment
-        uses: actions/setup-node@v6.5.0
-        with:
-          node-version: '20'
-          cache: 'npm'
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -40,14 +34,26 @@ jobs:
       - name: Set JAVA_HOME
         run: echo "JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac))))" >> $GITHUB_ENV
 
+      - name: Cache buildozer global directory
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer
+          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
+
+      - name: Cache buildozer local directory (Android SDK/NDK)
+        uses: actions/cache@v4
+        with:
+          path: .buildozer
+          key: buildozer-local-${{ hashFiles('buildozer.spec') }}
+
       - name: Accept Android SDK licenses
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
 
       - name: Build debug APK
-        run: buildozer android debug
+        run: buildozer -v android debug
 
-      - name: Upload full build log
+      - name: Upload full build log (always, for debugging)
         if: always()
         uses: actions/upload-artifact@v4
         with:
