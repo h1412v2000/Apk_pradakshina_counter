@@ -36,52 +36,62 @@ jobs:
       - name: Set JAVA_HOME
         run: echo "JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac))))" >> $GITHUB_ENV
 
+      # NOTE: cache key now includes a version suffix so any previously-cached
+      # master checkout of python-for-android is discarded and rebuilt clean.
       - name: Cache buildozer global directory
         uses: actions/cache@v4
         with:
           path: ~/.buildozer
-          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
+          key: buildozer-global-v2-${{ hashFiles('buildozer.spec') }}
 
       - name: Cache buildozer local directory (Android SDK/NDK)
         uses: actions/cache@v4
         with:
           path: .buildozer
-          key: buildozer-local-${{ hashFiles('buildozer.spec') }}
+          key: buildozer-local-v2-${{ hashFiles('buildozer.spec') }}
 
       - name: Accept Android SDK licenses
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
 
-      - name: Patch buildozer.spec (fix Python/NDK API build errors)
+      - name: Patch buildozer.spec (fix Python/NDK version mismatch)
         run: |
-          # Ensure python3 is pinned to a stable version compatible with p4a 2024.1.21
-          # (avoids p4a pulling bleeding-edge CPython 3.14 source that breaks on Android NDK headers)
+          # Pin a stable python3 requirement compatible with p4a 2024.1.21
           if grep -q "^requirements" buildozer.spec; then
             sed -i -E 's/^requirements[[:space:]]*=.*/requirements = python3==3.11.9,kivy,plyer,requests/' buildozer.spec
           else
             echo "requirements = python3==3.11.9,kivy,plyer,requests" >> buildozer.spec
           fi
 
-          # Raise ndk_api to 24+ so preadv/pwritev are declared by Bionic libc
+          # Set ndk_api/minapi to 24 (preadv/pwritev need API 24+)
           if grep -q "^android.ndk_api" buildozer.spec; then
             sed -i -E 's/^android.ndk_api[[:space:]]*=.*/android.ndk_api = 24/' buildozer.spec
           else
             echo "android.ndk_api = 24" >> buildozer.spec
           fi
-
           if grep -q "^android.minapi" buildozer.spec; then
             sed -i -E 's/^android.minapi[[:space:]]*=.*/android.minapi = 24/' buildozer.spec
           else
             echo "android.minapi = 24" >> buildozer.spec
           fi
 
-          # Remove any p4a.branch=master/dev pin that forces a fresh git clone
-          # of an unvetted p4a source (this is what pulled in the broken recipe)
+          # CRITICAL FIX: pin p4a to a stable tagged release instead of
+          # letting buildozer git-clone the "master" branch, which has a
+          # hostpython3 recipe hardcoded to CPython 3.14.2 (mismatched
+          # with our pinned python3==3.11.9, and broken on this NDK).
           sed -i -E '/^p4a\.branch[[:space:]]*=/d' buildozer.spec
           sed -i -E '/^p4a\.source_dir[[:space:]]*=/d' buildozer.spec
+          echo "p4a.branch = 2024.1.21" >> buildozer.spec
 
           echo "----- Patched buildozer.spec -----"
           cat buildozer.spec
+
+      - name: Remove any stale p4a checkout (forces re-clone of pinned branch)
+        run: |
+          # If a previous run (or cache) already cloned p4a's master branch,
+          # buildozer will keep reusing it and ignore the p4a.branch pin above.
+          # Delete it so buildozer clones the correct tagged release fresh.
+          rm -rf .buildozer/android/platform/python-for-android
 
       - name: Build and auto-diagnose
         run: python build_and_diagnose.py
