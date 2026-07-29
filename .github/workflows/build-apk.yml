@@ -52,6 +52,9 @@ jobs:
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
 
+      - name: Show buildozer.spec (sanity check)
+        run: cat buildozer.spec
+
       - name: Build debug APK
         run: buildozer -v android debug 2>&1 | tee build_output.log
 
