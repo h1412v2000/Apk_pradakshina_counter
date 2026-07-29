@@ -56,7 +56,7 @@ jobs:
         run: cat buildozer.spec
 
       - name: Build and auto-diagnose
-        run: python3 build_and_diagnose.py
+        run: python build_and_diagnose.py
 
       - name: Upload build log (always)
         if: always()
