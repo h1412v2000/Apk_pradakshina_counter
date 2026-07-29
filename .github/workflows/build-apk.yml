@@ -36,34 +36,32 @@ jobs:
       - name: Set JAVA_HOME
         run: echo "JAVA_HOME=$(dirname $(dirname $(readlink -f $(which javac))))" >> $GITHUB_ENV
 
-      # NOTE: cache key now includes a version suffix so any previously-cached
-      # master checkout of python-for-android is discarded and rebuilt clean.
+      # Cache keys bumped again (-v3-) to discard any previously cached
+      # master checkout of python-for-android from earlier failed runs.
       - name: Cache buildozer global directory
         uses: actions/cache@v4
         with:
           path: ~/.buildozer
-          key: buildozer-global-v2-${{ hashFiles('buildozer.spec') }}
+          key: buildozer-global-v3-${{ hashFiles('buildozer.spec') }}
 
       - name: Cache buildozer local directory (Android SDK/NDK)
         uses: actions/cache@v4
         with:
           path: .buildozer
-          key: buildozer-local-v2-${{ hashFiles('buildozer.spec') }}
+          key: buildozer-local-v3-${{ hashFiles('buildozer.spec') }}
 
       - name: Accept Android SDK licenses
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
 
-      - name: Patch buildozer.spec (fix Python/NDK version mismatch)
+      - name: Patch buildozer.spec (fix Python version + NDK API)
         run: |
-          # Pin a stable python3 requirement compatible with p4a 2024.1.21
           if grep -q "^requirements" buildozer.spec; then
             sed -i -E 's/^requirements[[:space:]]*=.*/requirements = python3==3.11.9,kivy,plyer,requests/' buildozer.spec
           else
             echo "requirements = python3==3.11.9,kivy,plyer,requests" >> buildozer.spec
           fi
 
-          # Set ndk_api/minapi to 24 (preadv/pwritev need API 24+)
           if grep -q "^android.ndk_api" buildozer.spec; then
             sed -i -E 's/^android.ndk_api[[:space:]]*=.*/android.ndk_api = 24/' buildozer.spec
           else
@@ -75,23 +73,45 @@ jobs:
             echo "android.minapi = 24" >> buildozer.spec
           fi
 
-          # CRITICAL FIX: pin p4a to a stable tagged release instead of
-          # letting buildozer git-clone the "master" branch, which has a
-          # hostpython3 recipe hardcoded to CPython 3.14.2 (mismatched
-          # with our pinned python3==3.11.9, and broken on this NDK).
+          # Remove any p4a.branch/source_dir lines — we now pin the p4a
+          # checkout ourselves in the next step instead of relying on
+          # buildozer.spec, since that key was not being honored.
           sed -i -E '/^p4a\.branch[[:space:]]*=/d' buildozer.spec
           sed -i -E '/^p4a\.source_dir[[:space:]]*=/d' buildozer.spec
-          echo "p4a.branch = 2024.1.21" >> buildozer.spec
 
           echo "----- Patched buildozer.spec -----"
           cat buildozer.spec
 
-      - name: Remove any stale p4a checkout (forces re-clone of pinned branch)
+      - name: Pre-clone python-for-android at a known-good version
         run: |
-          # If a previous run (or cache) already cloned p4a's master branch,
-          # buildozer will keep reusing it and ignore the p4a.branch pin above.
-          # Delete it so buildozer clones the correct tagged release fresh.
-          rm -rf .buildozer/android/platform/python-for-android
+          # Buildozer only clones p4a into this path if it doesn't already
+          # exist. By placing a pinned, stable release here ourselves first,
+          # we guarantee buildozer uses it instead of "master" (whose
+          # hostpython3 recipe currently targets a broken CPython 3.14.2).
+          set -e
+          P4A_DIR=".buildozer/android/platform/python-for-android"
+          mkdir -p "$(dirname "$P4A_DIR")"
+          rm -rf "$P4A_DIR"
+
+          # Try the exact pip-pinned release tag first; fall back to a
+          # known-stable tag if the naming differs on the p4a repo.
+          if git clone --branch 2024.1.21 --single-branch --depth 1 \
+              https://github.com/kivy/python-for-android.git "$P4A_DIR" 2>/tmp/clone_err.log; then
+            echo "Cloned p4a tag 2024.1.21 successfully."
+          else
+            echo "Tag 2024.1.21 not found, falling back to v2024.01.21..."
+            cat /tmp/clone_err.log
+            rm -rf "$P4A_DIR"
+            git clone --branch v2024.01.21 --single-branch --depth 1 \
+              https://github.com/kivy/python-for-android.git "$P4A_DIR"
+          fi
+
+          echo "----- p4a checked-out branch/tag -----"
+          git -C "$P4A_DIR" branch -vv || true
+          git -C "$P4A_DIR" describe --tags || true
+
+      - name: Show buildozer.spec (sanity check)
+        run: cat buildozer.spec
 
       - name: Build and auto-diagnose
         run: python build_and_diagnose.py
